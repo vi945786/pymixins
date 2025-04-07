@@ -20,7 +20,7 @@ assert func_ref()() == "original"
 with open(mixin.get_module_file("modify")) as file:
     code = file.readlines()
 code[1] = "\treturn 'modified'"
-mixin.redefine_modules_file_as_code(("modify", "\n".join(code)), max_replace_depth=1)
+mixin.redefine_modules_file_as_code(("modify", "\n".join(code)))
 
 assert modify.func() == "modified"
 assert func() == "modified"
