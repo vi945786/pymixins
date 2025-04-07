@@ -37,7 +37,7 @@ def define_module_as_code(code_string: str, module_name: str):
     return module
 
 
-def replace_everywhere(old_obj, new_obj, max_depth=2):
+def replace_everywhere(old_obj, new_obj, max_depth=1):
     seen = set()
     obj_list = [(old_obj, new_obj, 0)]
 
@@ -85,7 +85,7 @@ def replace_everywhere(old_obj, new_obj, max_depth=2):
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[str, str],
-    max_replace_depth=2
+    max_replace_depth=1
 ) -> List[Tuple[types.ModuleType, dict]]:
 
     redefined: List[Tuple[types.ModuleType, str, dict]] = []
