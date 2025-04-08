@@ -3,7 +3,7 @@ import sys
 import os
 import types
 import weakref
-from typing import List, Tuple
+from typing import List, Tuple, Any
 import mixin.object_manipulator as om
 
 
@@ -37,16 +37,18 @@ def define_module_as_code(module_name: str, code_string: str):
     return module
 
 
-def replace_everywhere(old_obj, new_obj, max_depth=1, weakref_depth=0):
-    weakref_depth = max_depth - weakref_depth
+def replace_everywhere(*objs: Tuple[Any, Any], max_depth=1, weakref_depth=0, do_weakrefs=True):
     seen = set()
-    obj_list = [(old_obj, new_obj, 0)]
+    obj_list = [(old_obj, new_obj, max_depth) for old_obj, new_obj in objs]
 
     while obj_list:
         old, new, depth = obj_list.pop(0)
         if id(old) in seen:
             continue
         seen.add(id(old))
+
+        if depth < 0:
+            continue
 
         for referrer in gc.get_referrers(old):
             if referrer is old or isinstance(referrer, (str, tuple, int, float, complex)):
@@ -62,7 +64,7 @@ def replace_everywhere(old_obj, new_obj, max_depth=1, weakref_depth=0):
                                 if getattr(ref_ref, key[0]) is old:
                                     setattr(ref_ref, key[0], new)
 
-        if depth >= max_depth:
+        if depth <= 0:
             continue
 
         for key in om.get_all_keys(old):
@@ -75,16 +77,16 @@ def replace_everywhere(old_obj, new_obj, max_depth=1, weakref_depth=0):
             if old_val is new_val or id(old_val) in seen:
                 continue
 
-            for weak in weakref.getweakrefs(old_val):
-                obj_list.append((weak, weakref.ref(new_val), weakref_depth))
+            if do_weakrefs:
+                for weak in weakref.getweakrefs(old_val):
+                    obj_list.append((weak, weakref.ref(new_val), weakref_depth))
 
-            obj_list.append((old_val, new_val, depth + 1))
+            obj_list.append((old_val, new_val, depth - 1))
 
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[str, str],
-    replace_max_depth=1,
-    replace_weakref_depth=0
+    **kwargs
 ) -> List[Tuple[types.ModuleType, dict]]:
 
     redefined: List[Tuple[types.ModuleType, str, dict]] = []
@@ -103,6 +105,6 @@ def redefine_modules_file_as_code(
 
     for module, code, old_dict in redefined:
         exec(code, module.__dict__)
-        replace_everywhere(old_dict, module.__dict__, replace_max_depth,  replace_weakref_depth)
+        replace_everywhere((old_dict, module.__dict__), **{k.replace("replace_", "", 1): v for k, v in kwargs.items() if k.startswith("replace_")})
 
     return [(module, old_dict) for module, _, old_dict in redefined]
