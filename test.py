@@ -1,5 +1,4 @@
 import weakref
-
 import mixin
 import modify
 import time
@@ -20,9 +19,10 @@ assert func_ref()() == "original"
 
 with open(mixin.get_module_file("modify")) as file:
     code = file.readlines()
-code[1] = "\treturn 'modified'"
+code[1] = "    return 'modified'"
 time1 = time.time_ns()
 mixin.redefine_modules_file_as_code(("modify", "\n".join(code)))
+mixin.define_module_as_code("modify1", "\n".join(code))
 time2 = time.time_ns()
 
 assert modify.func() == "modified"

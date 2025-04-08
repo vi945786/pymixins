@@ -27,7 +27,7 @@ def get_module_file(module_name: str) -> str | None:
     return None
 
 
-def define_module_as_code(code_string: str, module_name: str):
+def define_module_as_code(module_name: str, code_string: str):
     if module_name in sys.modules:
         raise ValueError(f"Module '{module_name}' already exists")
 
