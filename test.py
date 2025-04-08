@@ -22,7 +22,6 @@ with open(mixin.get_module_file("modify")) as file:
 code[1] = "    return 'modified'"
 time1 = time.time_ns()
 mixin.redefine_modules_file_as_code(("modify", "\n".join(code)))
-mixin.define_module_as_code("modify1", "\n".join(code))
 time2 = time.time_ns()
 
 assert modify.func() == "modified"
