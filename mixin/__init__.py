@@ -37,7 +37,8 @@ def define_module_as_code(code_string: str, module_name: str):
     return module
 
 
-def replace_everywhere(old_obj, new_obj, max_depth=1):
+def replace_everywhere(old_obj, new_obj, max_depth=1, weakref_depth=0):
+    weakref_depth = max_depth - weakref_depth
     seen = set()
     obj_list = [(old_obj, new_obj, 0)]
 
@@ -51,10 +52,7 @@ def replace_everywhere(old_obj, new_obj, max_depth=1):
             if referrer is old or isinstance(referrer, (str, tuple, int, float, complex)):
                 continue
 
-            for key in om.get_keys_from_value(referrer, old):
-                if key[1] != "index":
-                    continue
-
+            for key in om.get_keys_from_value(referrer, old, do_attrs=False):
                 if om.get_value(referrer, key) is old:
                     om.set_value(referrer, key, new)
 
@@ -78,14 +76,15 @@ def replace_everywhere(old_obj, new_obj, max_depth=1):
                 continue
 
             for weak in weakref.getweakrefs(old_val):
-                obj_list.append((weak, weakref.ref(new_val), depth + 1))
+                obj_list.append((weak, weakref.ref(new_val), weakref_depth))
 
             obj_list.append((old_val, new_val, depth + 1))
 
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[str, str],
-    max_replace_depth=1
+    replace_max_depth=1,
+    replace_weakref_depth=0
 ) -> List[Tuple[types.ModuleType, dict]]:
 
     redefined: List[Tuple[types.ModuleType, str, dict]] = []
@@ -104,6 +103,6 @@ def redefine_modules_file_as_code(
 
     for module, code, old_dict in redefined:
         exec(code, module.__dict__)
-        replace_everywhere(old_dict, module.__dict__, max_replace_depth)
+        replace_everywhere(old_dict, module.__dict__, replace_max_depth,  replace_weakref_depth)
 
     return [(module, old_dict) for module, _, old_dict in redefined]

@@ -1,30 +1,43 @@
 from typing import Any, Tuple, List
 
 
-def get_all_keys(obj: Any) -> List[Tuple[Any, str]]:
-    keys = [(attr, "attr") for attr in dir(obj)]
-    if isinstance(obj, (list, tuple)):
+def get_all_keys(obj: Any, do_attrs=True, do_indexes=True, do_keys=True) -> List[Tuple[Any, str]]:
+    keys = []
+    if do_attrs:
+        keys += [(attr, "attr") for attr in dir(obj)]
+    if do_indexes and isinstance(obj, (list, tuple)):
         keys += [(i, "index") for i in range(len(obj))]
-    elif isinstance(obj, dict):
-        keys += [(k, "index") for k in obj.keys()]
+    elif do_keys and isinstance(obj, dict):
+        keys += [(k, "keys") for k in obj.keys()]
     return keys
 
 
-def get_all_value(obj: Any) -> List[Tuple[Any, str]]:
-    values = [(attr, "attr") for attr in dir(obj)]
-    if isinstance(obj, (list, tuple)):
+def get_all_value(obj: Any, do_attrs=True, do_indexes=True, do_keys=True) -> List[Tuple[Any, str]]:
+    values = []
+    if do_attrs:
+        values = [(attr, "attr") for attr in dir(obj)]
+    if do_indexes and isinstance(obj, (list, tuple)):
         values += [(i, "index") for i in range(len(obj))]
-    elif isinstance(obj, dict):
-        values += [(k, "index") for k in obj]
+    elif do_keys and isinstance(obj, dict):
+        values += [(k, "keys") for k in obj]
     return values
 
 
-def get_keys_from_value(obj: Any, value: Any) -> List[Tuple[Any, str]]:
-    keys = [(attr, "attr") for attr in dir(obj) if getattr(obj, attr, None) is value]
-    if isinstance(obj, (list, tuple)):
-        keys += [(i, "index") for i, v in enumerate(obj) if v is value]
-    elif isinstance(obj, dict):
-        keys += [(k, "index") for k, v in obj.items() if v is value]
+def get_keys_from_value(obj: Any, value: Any, do_attrs=True, do_indexes=True, do_keys=True) -> List[Tuple[Any, str]]:
+    keys = []
+
+    if do_attrs:
+        val_id = id(value)
+        for attr in dir(obj):
+            if id(getattr(obj, attr)) == val_id:
+                keys.append((attr, "attr"))
+
+    if do_indexes and isinstance(obj, (list, tuple)):
+        keys.extend((i, "index") for i, v in enumerate(obj) if v is value)
+
+    elif do_keys and isinstance(obj, dict):
+        keys.extend((k, "keys") for k, v in obj.items() if v is value)
+
     return keys
 
 
