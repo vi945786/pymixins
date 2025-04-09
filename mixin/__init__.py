@@ -37,7 +37,7 @@ def define_module_as_code(module_name: str, code_string: str):
     return module
 
 
-def replace_everywhere(*objs: Tuple[Any, Any], max_depth=1, weakref_depth=0, do_weakrefs=True):
+def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_depth: int = None, do_weakrefs: bool = True):
     seen = set()
     obj_list = [(old_obj, new_obj, max_depth) for old_obj, new_obj in objs]
 
@@ -47,41 +47,53 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth=1, weakref_depth=0, do_
             continue
         seen.add(id(old))
 
-        if depth < 0:
+        if depth and depth < 0:
             continue
 
         for referrer in gc.get_referrers(old):
-            if referrer is old or isinstance(referrer, (str, tuple, int, float, complex)):
+            if referrer is old or referrer is locals():
                 continue
 
             for key in om.get_keys_from_value(referrer, old, do_attrs=False):
-                if om.get_value(referrer, key) is old:
-                    om.set_value(referrer, key, new)
+                om.set_value(referrer, key, new)
 
-                    if isinstance(referrer, dict):
-                        for ref_ref in gc.get_referrers(referrer):
-                            if hasattr(ref_ref, "__dict__") and hasattr(ref_ref, key[0]):
-                                if getattr(ref_ref, key[0]) is old:
-                                    setattr(ref_ref, key[0], new)
+                if isinstance(referrer, dict):
+                    for ref_ref in gc.get_referrers(referrer):
+                        if hasattr(ref_ref, "__dict__") and hasattr(ref_ref, key[0]):
+                            if getattr(ref_ref, key[0]) is old:
+                                setattr(ref_ref, key[0], new)
 
-        if depth <= 0:
+        if depth and depth <= 0:
             continue
 
-        for key in om.get_all_keys(old):
-            if key not in om.get_all_keys(new):
-                continue
+        common_keys = []
 
+        new_type_keys = om.get_all_keys(type(new))
+        new_keys_no_attrs = om.get_all_keys(new, do_attrs=False)
+
+        if id(type(old)) not in seen:
+            seen.add(id(type(old)))
+            for key in om.get_all_keys(type(old)):
+                if key in new_type_keys:
+                    common_keys.append(key)
+
+        for key in om.get_all_keys(old, do_attrs=False):
+            if key in new_keys_no_attrs:
+                common_keys.append(key)
+
+        for key in common_keys:
             old_val = om.get_value(old, key)
             new_val = om.get_value(new, key)
 
             if old_val is new_val or id(old_val) in seen:
                 continue
 
+            obj_list.append((old_val, new_val, depth - 1 if depth else None))
+
             if do_weakrefs:
                 for weak in weakref.getweakrefs(old_val):
                     obj_list.append((weak, weakref.ref(new_val), weakref_depth))
 
-            obj_list.append((old_val, new_val, depth - 1))
 
 
 def redefine_modules_file_as_code(

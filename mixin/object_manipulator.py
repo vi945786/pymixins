@@ -1,3 +1,4 @@
+import gc
 from typing import Any, Tuple, List
 
 
@@ -50,7 +51,16 @@ def set_value(obj: Any, ref: Tuple[Any, str], value: Any) -> None:
         if ref[1] == "attr":
             setattr(obj, ref[0], value)
         else:
-            obj[ref[0]] = value
-    except AttributeError as e:
-        if "readonly attribute" not in str(e) and "not writable" not in str(e):
+            if isinstance(obj, tuple):
+                index = int(ref[0])
+                new_tuple = obj[:index] + (value,) + obj[index+1:]
+                for referrer in gc.get_referrers(obj):
+                    for key in get_keys_from_value(referrer, obj):
+                        set_value(referrer, key, new_tuple)
+            else:
+                obj[ref[0]] = value
+    except (AttributeError, TypeError) as e:
+        ok_exceptions = ["readonly attribute", "not writable", "not support item assignment"]
+        e_str = str(e)
+        if all([ok not in e_str for ok in ok_exceptions]):
             raise
