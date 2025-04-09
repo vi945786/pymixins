@@ -1,4 +1,5 @@
 import gc
+import importlib.util
 import sys
 import os
 import types
@@ -10,21 +11,23 @@ import mixin.object_manipulator as om
 def get_module_file(module_name: str) -> str | None:
     parts = module_name.split('.')
 
-    for path in sys.path:
-        if not os.path.isdir(path):
-            continue
+    path = importlib.util.find_spec(parts[0]).origin
+    if path == "built-in":
+        raise ValueError(f"{module_name} is a built-in module and does not have python source code")
 
-        potential_path = os.path.join(path, *parts)
+    path = os.path.dirname(path)
+    if path.endswith("__init__.py") or len(parts) > 1:
+        path = os.path.dirname(path)
 
-        init_file = os.path.join(potential_path, '__init__.py')
-        if os.path.isfile(init_file):
-            return init_file
+    path = os.path.join(path, *parts)
 
-        module_file = potential_path + '.py'
-        if os.path.isfile(module_file):
-            return module_file
+    init_file = os.path.join(path, '__init__.py')
+    if os.path.isfile(init_file):
+        return init_file
 
-    return None
+    module_file = path + '.py'
+    if os.path.isfile(module_file):
+        return module_file
 
 
 def define_module_as_code(module_name: str, code_string: str):
@@ -95,7 +98,6 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
                     obj_list.append((weak, weakref.ref(new_val), weakref_depth))
 
 
-
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[str, str],
     **kwargs
@@ -104,7 +106,7 @@ def redefine_modules_file_as_code(
     redefined: List[Tuple[types.ModuleType, str, dict]] = []
 
     for mod_name, code in redefine_modules:
-        module = __import__(mod_name)
+        module = importlib.import_module(mod_name)
         old_dict = module.__dict__.copy()
         redefined.append((module, code, old_dict))
 
