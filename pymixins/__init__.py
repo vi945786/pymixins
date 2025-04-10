@@ -7,10 +7,15 @@ import types
 import weakref
 from typing import List, Tuple, Any
 import pymixins.object_manipulator as om
+import inspect
 
 
-def get_module_file(module: types.ModuleType):
-    return module.__spec__.origin
+def get_module_code(module: types.ModuleType):
+    return inspect.getsource(module)
+
+    # if not module or not module.__spec__ or not module.__spec__.origin:
+    #     raise ValueError(f"{module} source file not found")
+    # return module.__spec__.origin
 
 
 def get_module_file_without_importing(module: str) -> str:
@@ -56,8 +61,12 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             continue
         seen.add(id(old))
 
-        if depth and depth < 0:
+        if depth and depth < 0 or isinstance(old, (int, float, complex, bool, str, bytes)):
             continue
+
+        if do_weakrefs:
+            for weak in weakref.getweakrefs(old):
+                obj_list.insert(0, (weak, weakref.ref(new), weakref_depth))
 
         for referrer in gc.get_referrers(old):
             if referrer is old or referrer is locals():
@@ -94,14 +103,10 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             old_val = om.get_value(old, key)
             new_val = om.get_value(new, key)
 
-            if old_val is new_val or id(old_val) in seen:
+            if old_val is new_val or id(old_val) in seen or old_val is None:
                 continue
 
             obj_list.append((old_val, new_val, depth - 1 if depth else None))
-
-            if do_weakrefs:
-                for weak in weakref.getweakrefs(old_val):
-                    obj_list.append((weak, weakref.ref(new_val), weakref_depth))
 
 
 def redefine_modules_file_as_code(

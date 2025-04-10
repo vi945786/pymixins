@@ -1,16 +1,17 @@
 import pymixins
 import time
-import test.modify as modify
 import test.tests as tests
+import test.modify as modify
 
 if __name__ == "__main__":
     tests.test("original")
 
-    with open(pymixins.get_module_file(modify)) as file:
-        code = file.readlines()
+    code = pymixins.get_module_code(modify).split("\n")
     code[1] = "    return 'modified'"
+    code = "\n".join(code)
+    [(module, old_module)] = pymixins.redefine_modules_file_as_code((modify, code), replace_max_depth=-1)
     time1 = time.time_ns()
-    pymixins.redefine_modules_file_as_code((modify, "\n".join(code)))
+    pymixins.replace_everywhere((old_module, module.__dict__))
     time2 = time.time_ns()
     print(f"{(time2 - time1) / 1_000_000_000}s")
 

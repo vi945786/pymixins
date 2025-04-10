@@ -20,7 +20,17 @@ class Test:
         return self.func()
 
 
+class SlotsTest:
+
+    __slots__ = ("func",)
+
+    def __init__(self):
+        from test.modify import func
+        self.func = func
+
+
 test_instance = Test()
+slot_test_instance = SlotsTest()
 
 
 def test(output):
@@ -29,6 +39,7 @@ def test(output):
     assert get_status() == output
     assert Test.func() == output
     assert test_instance.call_func() == output
+    assert slot_test_instance.func() == output
     assert func_ref()() == output
     assert func_tuple[0]() == output
     assert func_list[0]() == output

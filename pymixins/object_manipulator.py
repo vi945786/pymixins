@@ -14,6 +14,10 @@ def get_all_keys(obj: Any, do_attrs=True, skip_types=()) -> List[Tuple[Any, str]
             keys += [(i, "old_val") for i in obj]
         elif isinstance(obj, dict):
             keys += [(k, "keys") for k in obj.keys()]
+        else:
+            if hasattr(obj, "__slots__"):
+                slots = getattr(obj, "__slots__")
+                keys.extend([(slot, "attr") for slot in slots])
     return keys
 
 
@@ -33,6 +37,10 @@ def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> L
             keys += [(i, "old_val") for i in obj]
         elif isinstance(obj, dict):
             keys.extend((k, "keys") for k, v in obj.items() if v is value)
+        else:
+            if hasattr(obj, "__slots__"):
+                slots = getattr(obj, "__slots__")
+                keys.extend([(slot, "attr") for slot in slots if getattr(obj, slot) is value])
     return keys
 
 
