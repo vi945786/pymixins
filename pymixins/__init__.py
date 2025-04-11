@@ -68,7 +68,8 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             for weak in weakref.getweakrefs(old):
                 obj_list.insert(0, (weak, weakref.ref(new), weakref_depth))
 
-        for referrer in gc.get_referrers(old):
+        referrers = gc.get_referrers(old)
+        for referrer in referrers:
             if referrer is old or referrer is locals():
                 continue
 

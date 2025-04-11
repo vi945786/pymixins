@@ -1,10 +1,13 @@
+import sys
+
 import pymixins
 import time
-import test.tests as tests
+from test.tests import run_tests
 import test.modify as modify
 
 if __name__ == "__main__":
-    tests.test("original")
+    tests_errors = list()
+    tests_errors.extend(run_tests("original"))
 
     code = pymixins.get_module_code(modify).split("\n")
     code[1] = "    return 'modified'"
@@ -15,6 +18,9 @@ if __name__ == "__main__":
     time2 = time.time_ns()
     print(f"{(time2 - time1) / 1_000_000_000}s")
 
-    tests.test("modified")
-
-    print("all tests passed")
+    tests_errors.extend(run_tests("modified"))
+    if len(tests_errors) == 0:
+        print("all tests passed")
+    else:
+        for e in tests_errors:
+            print(e, file=sys.stderr)
