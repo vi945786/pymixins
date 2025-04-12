@@ -13,10 +13,10 @@ if __name__ == "__main__":
     code[1] = "    return 'modified'"
     code = "\n".join(code)
     [(module, old_module)] = pymixins.redefine_modules_file_as_code((modify, code), replace_max_depth=-1)
-    time1 = time.time_ns()
+    time1 = time.time()
     pymixins.replace_everywhere((old_module, module.__dict__))
-    time2 = time.time_ns()
-    print(f"{(time2 - time1) / 1_000_000_000}s")
+    time2 = time.time()
+    print("redefining module: {:.4f}s".format((time2 - time1) / 1))
 
     tests_errors.extend(run_tests("modified"))
     if len(tests_errors) == 0:
