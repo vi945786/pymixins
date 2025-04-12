@@ -1,5 +1,7 @@
 import io
 import weakref
+import pymixins
+import time
 
 import test.modify as modify
 from test.modify import func
@@ -59,3 +61,17 @@ def assert_equals(actual, expected):
         return ''.join(traceback.format_list(stack[-2:-1]))[:-1] + f" expected '{expected}' but got '{actual}'"
     else:
         return None
+
+
+def time_redefine(module_name):
+    module = __import__(module_name)
+    code = pymixins.get_module_code(module)
+    [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
+    times = 100
+    all_time = 0
+    for _ in range(times):
+        time1 = time.time()
+        pymixins.replace_everywhere((old_module, module.__dict__))
+        time2 = time.time()
+        all_time += time2 - time1
+    print("redefining {} average: {:.4f}s".format(module.__name__, all_time / times))
