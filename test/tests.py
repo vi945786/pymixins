@@ -1,7 +1,11 @@
-import io
 import weakref
+from dataclasses import replace
+
 import pymixins
 import time
+import test.setup as setup
+setup.load_c_test()
+import c_test
 
 import test.modify as modify
 from test.modify import func
@@ -34,7 +38,7 @@ class SlotsTest:
 
 test_instance = Test()
 slot_test_instance = SlotsTest()
-
+c_class = c_test.Class(func)
 
 def run_tests(output):
     return tuple({
@@ -48,7 +52,8 @@ def run_tests(output):
         assert_equals(func_tuple[0](), output),
         assert_equals(func_list[0](), output),
         assert_equals(func_set.copy().pop()(), output),
-        assert_equals(list(func_frozenset)[0](), output)
+        assert_equals(list(func_frozenset)[0](), output),
+        assert_equals(c_class.ref(), output)
     } - {None})
 
 
@@ -66,10 +71,10 @@ def assert_equals(actual, expected):
 def time_redefine(module_name):
     module = __import__(module_name)
     code = pymixins.get_module_code(module)
-    [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
     times = 100
     all_time = 0
-    for _ in range(times):
+    for i in range(times):
+        [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
         time1 = time.time()
         pymixins.replace_everywhere((old_module, module.__dict__))
         time2 = time.time()

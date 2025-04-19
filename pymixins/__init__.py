@@ -55,6 +55,11 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
     seen = set()
     obj_list = [(old_obj, new_obj, max_depth) for old_obj, new_obj in objs]
 
+    if max_depth == -1:
+        return
+
+    gc.collect()
+    all_objs = om.get_all_objs()
     while obj_list:
         old, new, depth = obj_list.pop(0)
         if id(old) in seen:
@@ -68,19 +73,10 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             for weak in weakref.getweakrefs(old):
                 obj_list.insert(0, (weak, weakref.ref(new), weakref_depth))
 
-        referrers = gc.get_referrers(old)
-        for referrer in referrers:
-            if referrer is old or referrer is locals():
-                continue
-
-            for key in om.get_keys_from_value(referrer, old, do_attrs=False):
+        refs = om.get_all_refs_to_value(all_objs, old, old, locals(), all_objs)
+        for referrer, keys in refs:
+            for key in keys:
                 om.set_value(referrer, key, new)
-
-                if isinstance(referrer, dict):
-                    for ref_ref in gc.get_referrers(referrer):
-                        if hasattr(ref_ref, "__dict__") and hasattr(ref_ref, key[0]):
-                            if getattr(ref_ref, key[0]) is old:
-                                setattr(ref_ref, key[0], new)
 
         if depth and depth <= 0:
             continue
@@ -88,15 +84,9 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
         common_keys = []
 
         new_type_keys = om.get_all_keys(type(new))
-        new_keys_no_attrs = om.get_all_keys(new, do_attrs=False)
+        new_keys_no_attrs = om.get_all_keys(new)
 
-        if id(type(old)) not in seen:
-            seen.add(id(type(old)))
-            for key in om.get_all_keys(type(old)):
-                if key in new_type_keys:
-                    common_keys.append(key)
-
-        for key in om.get_all_keys(old, do_attrs=False):
+        for key in om.get_all_keys(old):
             if key in new_keys_no_attrs:
                 common_keys.append(key)
 
@@ -108,7 +98,7 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
                 continue
 
             obj_list.append((old_val, new_val, depth - 1 if depth else None))
-
+    gc.collect()
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[types.ModuleType, str],
