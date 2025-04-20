@@ -1,5 +1,3 @@
-import sys
-
 from test.tests import *
 import test.modify as modify
 

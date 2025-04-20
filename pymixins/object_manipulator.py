@@ -1,13 +1,16 @@
 import gc
 import inspect
 import types
+from types import GetSetDescriptorType, MemberDescriptorType
 from typing import Any, Tuple, List
 
 
 def get_all_keys(obj: Any, do_attrs=True, skip_types=()) -> List[Tuple[Any, str]]:
     keys = []
     if do_attrs:
-        keys += [(k, "attr") for base in type(obj).__mro__ for k, v in base.__dict__.items() if isinstance(v, types.GetSetDescriptorType)]
+        for k, v in inspect.getmembers(obj):
+            if isinstance(v, GetSetDescriptorType):
+                keys.append((k, "attr"))
 
     if not isinstance(obj, skip_types):
         if isinstance(obj, (list, tuple)):
@@ -25,13 +28,18 @@ def _get_attr_keys_from_value(obj: Any, val_id: int):
         keys = _get_attr_keys_from_value_cache[type(obj)]
     else:
         obj_type = type(obj)
-        keys = []
-        for k, v in inspect.getmembers(obj):
-            if isinstance(getattr(obj_type, k, None), types.GetSetDescriptorType):
-                keys.append((k, "attr"))
+        keys = [(k, "attr") for k, v in inspect.getmembers(obj) if not isinstance(getattr(obj_type, k, None), (types.NoneType, types.WrapperDescriptorType))]
         _get_attr_keys_from_value_cache[obj_type] = keys
+    filtered_keys = []
 
-    return [key for key in keys if id(getattr(obj, key[0])) == val_id]
+    for key in keys:
+        try:
+            if id(getattr(obj, key[0])) == val_id:
+                filtered_keys.append(key)
+        except (ValueError, AttributeError):
+            pass
+
+    return filtered_keys
 
 
 def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> List[Tuple[Any, str]]:
@@ -54,15 +62,19 @@ def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> L
         except TypeError:
             pass
     elif t is dict:
-        keys.extend((k, "keys") for k, v in obj.items() if v is value)
+        for k, v in obj.items():
+            if v is value:
+                keys.append((k, "keys"))
 
     return keys
 
 
-def get_all_values(obj: Any, do_attrs=True, skip_types=()) -> list[tuple[Any, tuple[Any, str]]]:
+def get_all_values(obj: Any, do_attrs=True, skip_types=()) -> list[GetSetDescriptorType]:
     values = []
     if do_attrs:
-        values += [v for base in type(obj).__mro__ for _, v in base.__dict__.items() if isinstance(v, types.GetSetDescriptorType)]
+        for _, v in inspect.getmembers(obj):
+            if isinstance(v, GetSetDescriptorType):
+                values.append(v)
 
     if not isinstance(obj, skip_types):
         if isinstance(obj, (list, tuple)):
