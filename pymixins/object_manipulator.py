@@ -28,7 +28,10 @@ def _get_attr_keys_from_value(obj: Any, val_id: int):
         keys = _get_attr_keys_from_value_cache[type(obj)]
     else:
         obj_type = type(obj)
-        keys = [(k, "attr") for k, v in inspect.getmembers(obj) if not isinstance(getattr(obj_type, k, None), (types.NoneType, types.WrapperDescriptorType))]
+        keys = []
+        for k, v in inspect.getmembers(obj):
+            if not isinstance(getattr(obj_type, k, None), (types.NoneType, types.WrapperDescriptorType)):
+                keys.append((k, "attr"))
         _get_attr_keys_from_value_cache[obj_type] = keys
     filtered_keys = []
 
@@ -96,31 +99,25 @@ def get_value(obj: Any, ref: Tuple[Any, str]) -> Any:
 
 
 def set_value(obj: Any, ref: Tuple[Any, str], value: Any) -> None:
-    try:
-        if ref[1] == "attr":
-            setattr(obj, ref[0], value)
-        else:
-            if (isinstance(obj, tuple) and ref[1] == "index") or (isinstance(obj, frozenset) and ref[1] == "old_val"):
-                if isinstance(obj, tuple):
-                    index = int(ref[0])
-                    new_instance = obj[:index] + (value,) + obj[index+1:]
-                else:
-                    new_instance = frozenset(x if x != ref[0] else value for x in obj)
-                for referrer in gc.get_referrers(obj):
-                    if referrer is locals():
-                        continue
-                    for key in get_keys_from_value(referrer, obj):
-                        set_value(referrer, key, new_instance)
-            elif ref[1] == "index" or ref[1] == "keys":
-                obj[ref[0]] = value
-            elif ref[1] == "old_val":
-                obj.discard(ref[0])
-                obj.add(value)
-    except (AttributeError, TypeError) as e:
-        ok_exceptions = ["readonly attribute", "not writable", "not support item assignment"]
-        e_str = str(e)
-        if all([ok not in e_str for ok in ok_exceptions]):
-            raise
+    if ref[1] == "attr":
+        setattr(obj, ref[0], value)
+    else:
+        if (isinstance(obj, tuple) and ref[1] == "index") or (isinstance(obj, frozenset) and ref[1] == "old_val"):
+            if isinstance(obj, tuple):
+                index = int(ref[0])
+                new_instance = obj[:index] + (value,) + obj[index+1:]
+            else:
+                new_instance = frozenset(x if x != ref[0] else value for x in obj)
+            for referrer in gc.get_referrers(obj):
+                if referrer is locals():
+                    continue
+                for key in get_keys_from_value(referrer, obj):
+                    set_value(referrer, key, new_instance)
+        elif ref[1] == "index" or ref[1] == "keys":
+            obj[ref[0]] = value
+        elif ref[1] == "old_val":
+            obj.discard(ref[0])
+            obj.add(value)
 
 
 def get_all_refs_to_value(all_objs, value, *ignore):
