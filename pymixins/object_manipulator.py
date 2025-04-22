@@ -1,7 +1,7 @@
 import gc
 import inspect
 import types
-from types import GetSetDescriptorType, MemberDescriptorType
+from types import GetSetDescriptorType
 from typing import Any, Tuple, List
 
 
@@ -29,20 +29,21 @@ def _get_attr_keys_from_value(obj: Any, val_id: int):
     else:
         obj_type = type(obj)
         keys = []
-        for k, v in inspect.getmembers(obj):
-            if not isinstance(getattr(obj_type, k, None), (types.NoneType, types.WrapperDescriptorType)):
+        for k in dir(obj):
+            old_v = obj_type.__dict__.get(k, None)
+            if not isinstance(old_v, (types.NoneType, types.WrapperDescriptorType)):
                 keys.append((k, "attr"))
-        _get_attr_keys_from_value_cache[obj_type] = keys
-    filtered_keys = []
+            _get_attr_keys_from_value_cache[obj_type] = keys
 
-    for key in keys:
+    filter_keys = []
+    for k in keys:
         try:
-            if id(getattr(obj, key[0])) == val_id:
-                filtered_keys.append(key)
+            if id(getattr(obj, k[0])) == val_id:
+                filter_keys.append((k, "attr"))
         except (ValueError, AttributeError):
             pass
 
-    return filtered_keys
+    return filter_keys
 
 
 def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> List[Tuple[Any, str]]:
@@ -70,6 +71,31 @@ def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> L
                 keys.append((k, "keys"))
 
     return keys
+
+
+def get_keys_and_values(obj, do_attrs=True, skip_types=()):
+    if isinstance(obj, skip_types):
+        return []
+
+    kvs = []
+
+    if do_attrs:
+        append = kvs.append
+        for k in dir(obj):
+            try:
+                append(((k, "attr"), getattr(obj, k)))
+            except (ValueError, AttributeError):
+                continue
+
+    t = type(obj)
+    if t is list or t is tuple:
+        kvs.extend(((i, "index"), v) for i, v in enumerate(obj))
+    elif t is set or t is frozenset:
+        kvs.extend(((v, "old_val"), v) for v in obj)
+    elif t is dict:
+        kvs.extend(((k, "keys"), v) for k, v in obj.items())
+
+    return kvs
 
 
 def get_all_values(obj: Any, do_attrs=True, skip_types=()) -> list[GetSetDescriptorType]:
@@ -120,12 +146,12 @@ def set_value(obj: Any, ref: Tuple[Any, str], value: Any) -> None:
             obj.add(value)
 
 
-def get_all_refs_to_value(all_objs, value, *ignore):
-    ignore = {id(i) for i in ignore}
-    return [(o, refs) for o in all_objs if id(o) not in ignore and (refs := get_keys_from_value(o, value))]
+def get_all_refs_to_value(objs_graph, value, *ignore):
+    # ignore = {id(i) for i in ignore}
+    # return [(o, refs) for o in all_objs if id(o) not in ignore and (refs := get_keys_from_value(o, value))]
+    return objs_graph[id(value)]
 
-
-def get_all_objs():
+def _get_all_objs():
     objs = []
     seen = set()
     todo = gc.get_objects()
@@ -140,3 +166,13 @@ def get_all_objs():
         todo.extend(gc.get_referents(o))
 
     return objs
+
+def get_objs_graph():
+    all_objs = _get_all_objs()
+    graph = {}
+
+    for o in all_objs:
+        for k, v in get_keys_and_values(o):
+            graph.setdefault(id(v), []).append((o, k))
+
+    return graph
