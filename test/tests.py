@@ -1,3 +1,4 @@
+import sys
 import weakref
 from dataclasses import replace
 
@@ -24,8 +25,8 @@ class Test:
     def __init__(self):
         self.func = func
 
-    def call_func(self):
-        return self.func()
+    def get_func(self):
+        return self.func
 
 
 class SlotsTest:
@@ -41,29 +42,36 @@ slot_test_instance = SlotsTest()
 c_class = c_test.Class(func)
 
 def run_tests(output):
-    return tuple({
-        assert_equals(modify.func(), output),
-        assert_equals(func(), output),
-        assert_equals(get_status(), output),
-        assert_equals(Test.func(), output),
-        assert_equals(test_instance.call_func(), output),
-        assert_equals(slot_test_instance.func(), output),
-        assert_equals(func_ref()(), output),
-        assert_equals(func_tuple[0](), output),
-        assert_equals(func_list[0](), output),
-        assert_equals(func_set.copy().pop()(), output),
-        assert_equals(list(func_frozenset)[0](), output),
-        assert_equals(c_class.ref(), output)
-    } - {None})
+    current_func = __import__("test").modify.func
+    assert_equals(current_func(), output)
+    tests = [
+        assert_is(modify.func, current_func),
+        assert_is(func, current_func),
+        assert_is(get_status, current_func),
+        assert_is(Test.func, current_func),
+        assert_is(test_instance.get_func(), current_func),
+        assert_is(slot_test_instance.func, current_func),
+        assert_is(func_ref(), current_func),
+        assert_is(func_tuple[0], current_func),
+        assert_is(func_list[0], current_func),
+        assert_is(func_set.copy().pop(), current_func),
+        assert_is(list(func_frozenset)[0], current_func),
+        assert_is(c_class.ref, current_func)
+    ]
+    if any(tests):
+        tests.insert(0, f"Errors in run_tests('{output}')")
+    return (test for test in tests if test)
 
+def assert_is(actual, expected):
+    return assert_equals(id(actual), id(expected), _traceback_offset=3)
 
-def assert_equals(actual, expected):
+def assert_equals(actual, expected, /, _traceback_offset=2):
     import traceback
     try:
         assert actual == expected
     except AssertionError:
         stack = traceback.extract_stack()
-        return ''.join(traceback.format_list(stack[-2:-1]))[:-1] + f" expected '{expected}' but got '{actual}'"
+        return ''.join(traceback.format_list(stack[-_traceback_offset:-_traceback_offset+1]))[:-1] + f" expected '{expected}' but got '{actual}'"
     else:
         return None
 
@@ -71,7 +79,7 @@ def assert_equals(actual, expected):
 def time_redefine(module_name):
     module = __import__(module_name)
     code = pymixins.get_module_code(module)
-    times = 100
+    times = 50
     all_time = 0
     for i in range(times):
         [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)

@@ -13,17 +13,13 @@ import inspect
 def get_module_code(module: types.ModuleType):
     return inspect.getsource(module)
 
-    # if not module or not module.__spec__ or not module.__spec__.origin:
-    #     raise ValueError(f"{module} source file not found")
-    # return module.__spec__.origin
-
 
 def get_module_file_without_importing(module: str) -> str:
     parts = module.split('.')
 
     path = importlib.util.find_spec(parts[0]).origin
     if path == "built-in":
-        raise ValueError(f"{module} is a built-in module and does not have python source code")
+        raise TypeError(f"{module} is a built-in module and does not have python source code")
 
     if len(parts) == 1:
         return path
@@ -52,53 +48,52 @@ def define_module_as_code(module_name: str, code_string: str):
 
 
 def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_depth: int = None, do_weakrefs: bool = True):
-    seen = set()
-    obj_list = [(old_obj, new_obj, max_depth) for old_obj, new_obj in objs]
-
     if max_depth == -1:
         return
 
+    seen = set()
+    obj_queue = [(old, new, max_depth) for old, new in objs]
+
+    primitives = (int, float, complex, bool, str, bytes, tuple, frozenset, types.EllipsisType)
+
     gc.collect()
     all_objs = om.get_all_objs()
-    while obj_list:
-        old, new, depth = obj_list.pop(0)
-        if id(old) in seen:
-            continue
-        seen.add(id(old))
 
-        if depth and depth < 0 or isinstance(old, (int, float, complex, bool, str, bytes)):
+    while obj_queue:
+        old, new, depth = obj_queue.pop()
+        old_id = id(old)
+        if old_id in seen or isinstance(old, primitives):
             continue
+        seen.add(old_id)
 
         if do_weakrefs:
             for weak in weakref.getweakrefs(old):
-                obj_list.insert(0, (weak, weakref.ref(new), weakref_depth))
+                obj_queue.append((weak, weakref.ref(new), weakref_depth))
 
-        refs = om.get_all_refs_to_value(all_objs, old, old, locals(), all_objs)
-        for referrer, keys in refs:
+        for referrer, keys in om.get_all_refs_to_value(all_objs, old, old, locals(), all_objs):
             for key in keys:
                 om.set_value(referrer, key, new)
 
-        if depth and depth <= 0:
+        if depth is not None and depth <= 0:
             continue
 
-        common_keys = []
-
-        new_type_keys = om.get_all_keys(type(new))
-        new_keys_no_attrs = om.get_all_keys(new)
-
-        for key in om.get_all_keys(old):
-            if key in new_keys_no_attrs:
-                common_keys.append(key)
+        old_keys = om.get_all_keys(old)
+        new_keys = om.get_all_keys(new)
+        common_keys = [k for k in old_keys if k in new_keys]
 
         for key in common_keys:
             old_val = om.get_value(old, key)
             new_val = om.get_value(new, key)
 
-            if old_val is new_val or id(old_val) in seen or old_val is None:
-                continue
+            if old_val is None or (isinstance(old_val, primitives) and old_val == new_val):
+                om.set_value(old, key, new_val)
 
-            obj_list.append((old_val, new_val, depth - 1 if depth else None))
+            if old_val is not new_val and id(old_val) not in seen:
+                next_depth = depth - 1 if depth is not None else None
+                obj_queue.append((old_val, new_val, next_depth))
+
     gc.collect()
+
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[types.ModuleType, str],
