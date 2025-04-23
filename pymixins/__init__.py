@@ -47,36 +47,28 @@ def define_module_as_code(module_name: str, code_string: str):
     return module
 
 
-def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_depth: int = None, do_weakrefs: bool = True):
-    if max_depth == -1:
-        return
-
+def replace_everywhere(*objs: Tuple[Any, Any], do_weakrefs: bool = True):
     seen = set()
-    obj_queue = [(old, new, max_depth) for old, new in objs]
+    obj_queue = [(old, new) for old, new in objs]
 
-    primitives = (int, float, complex, bool, str, bytes, tuple, frozenset, types.EllipsisType)
+    primitive_types = (str, int, tuple, float, bool, bytes, frozenset, complex)
 
     gc.collect()
     all_objs = om.get_all_objs()
 
     while obj_queue:
-        old, new, depth = obj_queue.pop()
+        old, new = obj_queue.pop()
         old_id = id(old)
-        if old_id in seen or isinstance(old, primitives):
+        if old_id in seen:
             continue
         seen.add(old_id)
 
         if do_weakrefs:
             for weak in weakref.getweakrefs(old):
-                obj_queue.append((weak, weakref.ref(new), weakref_depth))
+                obj_queue.append((weak, weakref.ref(new)))
 
-        refs = om.get_all_refs_to_value(all_objs, old)
-        for referrer, keys in refs:
-            for key in keys:
-                om.set_value(referrer, key, new)
-
-        if depth is not None and depth <= 0:
-            continue
+        for referrer, key in om.get_all_refs_to_value(all_objs, old):
+            om.set_value(referrer, key, new)
 
         old_keys = om.get_all_keys(old)
         new_keys = om.get_all_keys(new)
@@ -86,18 +78,19 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             old_val = om.get_value(old, key)
             new_val = om.get_value(new, key)
 
-            if old_val is None or (isinstance(old_val, primitives) and old_val == new_val):
+            if isinstance(old_val, primitive_types):
                 om.set_value(old, key, new_val)
+                continue
 
             if old_val is not new_val and id(old_val) not in seen:
-                next_depth = depth - 1 if depth is not None else None
-                obj_queue.append((old_val, new_val, next_depth))
+                obj_queue.append((old_val, new_val))
 
     gc.collect()
 
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[types.ModuleType, str],
+    do_replace=True,
     **kwargs
 ) -> List[Tuple[types.ModuleType, dict]]:
 
@@ -120,6 +113,7 @@ def redefine_modules_file_as_code(
 
     for module, code, old_dict in redefined:
         exec(code, module.__dict__)
-        replace_everywhere((old_dict, module.__dict__), **{k.replace("replace_", "", 1): v for k, v in kwargs.items() if k.startswith("replace_")})
+        if do_replace:
+            replace_everywhere((old_dict, module.__dict__), **{k.replace("replace_", "", 1): v for k, v in kwargs.items() if k.startswith("replace_")})
 
     return [(module, old_dict) for module, _, old_dict in redefined]

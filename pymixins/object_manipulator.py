@@ -120,7 +120,7 @@ def set_value(obj: Any, ref: Tuple[Any, str], value: Any) -> None:
         pass
 
 def get_all_refs_to_value(all_objs, value):
-    return [(o, refs) for o in all_objs if (refs := get_keys_from_value(o, value))]
+    return [(o, ref) for o in all_objs for ref in get_keys_from_value(o, value)]
 
 
 def get_all_objs():

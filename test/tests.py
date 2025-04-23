@@ -79,7 +79,7 @@ def time_redefine(module_name, times=50):
     code = pymixins.get_module_code(module)
     all_time = 0
     for i in range(times):
-        [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
+        [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), do_replace=False)
         time1 = time.time()
         pymixins.replace_everywhere((old_module, module.__dict__))
         time2 = time.time()
