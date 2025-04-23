@@ -3,7 +3,6 @@ import importlib.util
 import pkgutil
 import sys
 import os
-import time
 import types
 import weakref
 from typing import List, Tuple, Any
@@ -55,16 +54,15 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
     seen = set()
     obj_queue = [(old, new, max_depth) for old, new in objs]
 
-    replace_types = (int, float, complex, bool, str, bytes, tuple, frozenset)
-    ignore_types = (types.NoneType, types.EllipsisType)
+    primitives = (int, float, complex, bool, str, bytes, tuple, frozenset, types.EllipsisType)
 
     gc.collect()
-    objs_graph = om.get_objs_graph()
-    time1 = time.time()
+    all_objs = om.get_all_objs()
+
     while obj_queue:
         old, new, depth = obj_queue.pop()
         old_id = id(old)
-        if old_id in seen:
+        if old_id in seen or isinstance(old, primitives):
             continue
         seen.add(old_id)
 
@@ -72,8 +70,9 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             for weak in weakref.getweakrefs(old):
                 obj_queue.append((weak, weakref.ref(new), weakref_depth))
 
-        for referrer, key in om.get_all_refs_to_value(objs_graph, old):
-            if key is not old and key is not locals():
+        refs = om.get_all_refs_to_value(all_objs, old, old, locals(), all_objs)
+        for referrer, keys in refs:
+            for key in keys:
                 om.set_value(referrer, key, new)
 
         if depth is not None and depth <= 0:
@@ -87,20 +86,15 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             old_val = om.get_value(old, key)
             new_val = om.get_value(new, key)
 
-            if isinstance(old_val, replace_types) and old_val != new_val:
+            if old_val is None or (isinstance(old_val, primitives) and old_val == new_val):
                 om.set_value(old, key, new_val)
-                continue
-
-            if isinstance(old_val, ignore_types):
-                continue
 
             if old_val is not new_val and id(old_val) not in seen:
                 next_depth = depth - 1 if depth is not None else None
                 obj_queue.append((old_val, new_val, next_depth))
 
     gc.collect()
-    time2 = time.time()
-    print(time2 - time1)
+
 
 def redefine_modules_file_as_code(
     *redefine_modules: Tuple[types.ModuleType, str],

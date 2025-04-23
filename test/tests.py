@@ -79,7 +79,7 @@ def assert_equals(actual, expected, /, _traceback_offset=2):
 def time_redefine(module_name):
     module = __import__(module_name)
     code = pymixins.get_module_code(module)
-    times = 1
+    times = 50
     all_time = 0
     for i in range(times):
         [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
