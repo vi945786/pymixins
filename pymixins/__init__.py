@@ -70,7 +70,7 @@ def replace_everywhere(*objs: Tuple[Any, Any], max_depth: int = None, weakref_de
             for weak in weakref.getweakrefs(old):
                 obj_queue.append((weak, weakref.ref(new), weakref_depth))
 
-        refs = om.get_all_refs_to_value(all_objs, old, old, locals(), all_objs)
+        refs = om.get_all_refs_to_value(all_objs, old)
         for referrer, keys in refs:
             for key in keys:
                 om.set_value(referrer, key, new)

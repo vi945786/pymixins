@@ -1,3 +1,5 @@
+import sys
+
 from test.tests import *
 import test.modify as modify
 
@@ -12,7 +14,7 @@ if __name__ == "__main__":
 
     tests_errors.extend(run_tests("modified"))
     if len(tests_errors) == 0:
-        print("all tests passed")
+        print("\033[92m" + f"all tests passed" + "\033[0m")
     else:
         for e in tests_errors:
             print(e, file=sys.stderr)

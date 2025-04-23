@@ -1,6 +1,4 @@
-import sys
 import weakref
-from dataclasses import replace
 
 import pymixins
 import time
@@ -76,10 +74,9 @@ def assert_equals(actual, expected, /, _traceback_offset=2):
         return None
 
 
-def time_redefine(module_name):
+def time_redefine(module_name, times=50):
     module = __import__(module_name)
     code = pymixins.get_module_code(module)
-    times = 50
     all_time = 0
     for i in range(times):
         [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), replace_max_depth=-1)
@@ -87,4 +84,4 @@ def time_redefine(module_name):
         pymixins.replace_everywhere((old_module, module.__dict__))
         time2 = time.time()
         all_time += time2 - time1
-    print("redefining {} average: {:.4f}s".format(module.__name__, all_time / times))
+    print("redefining {} {} times took {:.4f}s with an average of {:.4f}s".format(module.__name__, times, all_time, all_time / times))
