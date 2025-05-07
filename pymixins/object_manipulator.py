@@ -7,7 +7,11 @@ def _get_all_attr_keys(obj):
 
     for base in type(obj).__mro__:
         for k, v in base.__dict__.items():
-            if hasattr(v, "__set__"):
+            try:
+                v.__set__(obj, getattr(obj, k))
+            except:
+                pass
+            else:
                 result.append((k, "attr", False))
 
     return result
@@ -59,30 +63,28 @@ def get_keys_from_value(obj: Any, value: Any, do_attrs=True, skip_types=()) -> L
     if do_attrs:
         keys.extend(_get_attr_keys_from_value(obj, val_id))
 
-    if isinstance(obj, skip_types):
-        return keys
-
-    t = type(obj)
-    if t is dict:
-        for k, v in obj.items():
-            if v is value:
-                keys.append((k, "keys", False))
-    elif t is list:
-        keys.extend((i, "index", False) for i, v in enumerate(obj) if v is value)
-    elif t is tuple:
-        keys.extend((i, "index", True) for i, v in enumerate(obj) if v is value)
-    elif t is set:
-        try:
-            if value in obj:
-                keys.append((value, "old_val", False))
-        except TypeError:
-            pass
-    elif t is frozenset:
-        try:
-            if value in obj:
-                keys.append((value, "old_val", True))
-        except TypeError:
-            pass
+    if not isinstance(obj, skip_types):
+        t = type(obj)
+        if t is dict:
+            for k, v in obj.items():
+                if v is value:
+                    keys.append((k, "keys", False))
+        elif t is list:
+            keys.extend((i, "index", False) for i, v in enumerate(obj) if v is value)
+        elif t is tuple:
+            keys.extend((i, "index", True) for i, v in enumerate(obj) if v is value)
+        elif t is set:
+            try:
+                if value in obj:
+                    keys.append((value, "old_val", False))
+            except TypeError:
+                pass
+        elif t is frozenset:
+            try:
+                if value in obj:
+                    keys.append((value, "old_val", True))
+            except TypeError:
+                pass
 
     return keys
 
@@ -138,3 +140,6 @@ def get_all_objs():
         todo.extend(gc.get_referents(o))
 
     return objs
+
+def clear_cache():
+    _get_attr_keys_from_value_cache.clear()

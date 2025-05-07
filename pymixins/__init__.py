@@ -85,6 +85,7 @@ def replace_everywhere(*objs: Tuple[Any, Any], do_weakrefs: bool = True):
             if old_val is not new_val and id(old_val) not in seen:
                 obj_queue.append((old_val, new_val))
 
+    om.clear_cache()
     gc.collect()
 
 

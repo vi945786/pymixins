@@ -77,11 +77,11 @@ def assert_equals(actual, expected, /, _traceback_offset=2):
 def time_redefine(module_name, times=50):
     module = __import__(module_name)
     code = pymixins.get_module_code(module)
-    all_time = 0
+    all_times = []
     for i in range(times):
         [(_, old_module)] = pymixins.redefine_modules_file_as_code((module, code), do_replace=False)
         time1 = time.time()
         pymixins.replace_everywhere((old_module, module.__dict__))
         time2 = time.time()
-        all_time += time2 - time1
-    print("redefining {} {} times took {:.4f}s with an average of {:.4f}s".format(module.__name__, times, all_time, all_time / times))
+        all_times.append(time2 - time1)
+    print("redefining {} {} times took {:.4f}s with an average of {:.4f}s, a max time of {:.4f}s and min time of {:.4f}".format(module.__name__, times, sum(all_times), sum(all_times) / times, max(all_times), min(all_times)))
